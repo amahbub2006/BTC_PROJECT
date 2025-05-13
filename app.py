@@ -38,30 +38,30 @@ def analyze():
     #Fantastic, now we can make a graph, to show the flow of BTC
     G = nx.DiGraph()
 
-    # Add all input addresses as edges leading to the TXID node
+    #Treating TXID as a node, we can add all input addresses as connections going INTO the node. EDIT: a connection between nodes AKA the movement of BTC is an edge.
     for vin in inputs:
         from_addr = vin.get('prevout', {}).get('scriptpubkey_address', 'unknown')
         G.add_edge(from_addr, txid)
 
-    # Add all output addresses as edges going out from the TXID node
+    #Add all output addresses as EDGES going OUT from the TXID node
     for vout in outputs:
         to_addr = vout.get('scriptpubkey_address', 'unknown')
         G.add_edge(txid, to_addr)
 
-    # Step 4: Draw and save the graph image
+    #Save the drawn graph image
     nx.draw(G, with_labels=True, node_color='lightblue', node_size=2000, font_size=8)
     plt.tight_layout()
-    plt.savefig('static/graph.png')  # Save graph to static folder
-    plt.clf()  # Clear plot for future use
+    plt.savefig('static/graph.png')  #gotta save the graph in a static folder
+    plt.clf()  #Clear the plot
 
-    # Step 5: Basic privacy score based on common privacy heuristics
+    #Privacy Score. Starts at 100 and then gets deducted based on privacy standards. MAIN THING THAT IM TRYNA SELL HERE. everything else after this is a supplementary to this feature, or built around this feature. I hope it works.
     score = 100
 
-    # Heuristic 1: More than one input → inputs likely owned by same person
+    #Privacy check #1: More than one input -> probably some kind of issue about multiple wallets owned by the same person.
     if len(inputs) > 1:
         score -= 20
 
-    # Heuristic 2: Output address equals input address → address reuse = bad
+    #Privacy check #2: Output address equals input address -> address reuse = bad. 
     reused = any(
         vout.get('scriptpubkey_address') == 
         inputs[0].get('prevout', {}).get('scriptpubkey_address')
@@ -70,9 +70,30 @@ def analyze():
     if reused:
         score -= 30
 
-    # Additional heuristics can be added here later...
+    #Privacy check #3: Round number outputs (e.g., 0.01 BTC) are super common and easy to guess
+    round_outputs = [v for v in outputs if v.get('value') in [1_000_000, 5_000_000, 10_000_000]]  # these are satoshis: 0.01, 0.05, 0.1 BTC
+    if round_outputs:
+        score -= 10
 
-    # Step 6: Return the result page with score and image
+    #Privacy check #4: Output address is the SAME as one of the inputs = you're sending change back to yourself = traceable
+    input_addresses = [vin.get('prevout', {}).get('scriptpubkey_address') for vin in inputs]
+    output_addresses = [vout.get('scriptpubkey_address') for vout in outputs]
+    for addr in output_addresses:
+        if addr in input_addresses:
+            score -= 20
+            break
+
+    #Privacy BONUS #5: One-time change address -> no reuse = good. We'll count this if at least one output is unique.
+    unique_outputs = [addr for addr in output_addresses if addr not in input_addresses]
+    if len(unique_outputs) >= 1:
+        score += 10
+
+    #Privacy BONUS #6: Equal outputs = CoinJoin-like structure -> hard to tell who got paid
+    output_values = [v.get('value') for v in outputs]
+    if len(output_values) >= 2 and len(set(output_values)) == 1:
+        score += 15
+
+    #Return the result page with score and image
     return render_template('result.html', score=score, txid=txid)
 
 # Run the Flask server
