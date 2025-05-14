@@ -1,16 +1,26 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Bitcoin Privacy Visualizer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
-    <h1>Bitcoin Transaction Privacy Checker</h1>
-    <p>Paste any BTC TXID below to analyze its privacy.</p>
-    
-    <form method="POST" action="/analyze">
-        <label>Transaction ID:</label><br>
-        <input type="text" name="txid" style="width: 400px;" required><br><br>
-        <button type="submit">Analyze</button>
-    </form>
+<body class="bg-light">
+
+    <div class="container py-5">
+        <h1 class="text-center mb-4">🔍 Bitcoin Transaction Privacy Visualizer</h1>
+        <p class="text-center">Enter any BTC transaction ID (TXID) to analyze its privacy level and see how traceable it is.</p>
+
+        <div class="card shadow p-4 mx-auto" style="max-width: 600px;">
+            <form method="POST" action="/analyze">
+                <div class="mb-3">
+                    <label for="txid" class="form-label"><strong>Transaction ID</strong></label>
+                    <input type="text" class="form-control" name="txid" id="txid" placeholder="Paste TXID here..." required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">🔬 Analyze Privacy</button>
+            </form>
+        </div>
+    </div>
+
 </body>
 </html>

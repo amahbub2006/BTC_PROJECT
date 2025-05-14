@@ -39,62 +39,74 @@ def analyze():
     G = nx.DiGraph()
 
     #Treating TXID as a node, we can add all input addresses as connections going INTO the node. EDIT: a connection between nodes AKA the movement of BTC is an edge.
-    for vin in inputs:
-        from_addr = vin.get('prevout', {}).get('scriptpubkey_address', 'unknown')
-        G.add_edge(from_addr, txid)
+    input_addresses = [vin.get('prevout', {}).get('scriptpubkey_address', 'unknown') for vin in inputs]
+    output_addresses = [vout.get('scriptpubkey_address', 'unknown') for vout in outputs]
 
-    #Add all output addresses as EDGES going OUT from the TXID node
-    for vout in outputs:
-        to_addr = vout.get('scriptpubkey_address', 'unknown')
-        G.add_edge(txid, to_addr)
+    for addr in input_addresses:
+        G.add_edge(addr, txid)
+    for addr in output_addresses:
+        G.add_edge(txid, addr)
 
-    #Save the drawn graph image
-    nx.draw(G, with_labels=True, node_color='lightblue', node_size=2000, font_size=8)
+    #Save the drawn graph image, but make it look way better!
+    pos = nx.spring_layout(G, k=1.5, seed=42)  # stable layout for clarity
+    plt.figure(figsize=(12, 8))  # bigger plot area
+    nx.draw(G, pos, with_labels=True, node_color='skyblue', node_size=1500, font_size=7, arrows=True)
     plt.tight_layout()
     plt.savefig('static/graph.png')  #gotta save the graph in a static folder
     plt.clf()  #Clear the plot
 
     #Privacy Score. Starts at 100 and then gets deducted based on privacy standards. MAIN THING THAT IM TRYNA SELL HERE. everything else after this is a supplementary to this feature, or built around this feature. I hope it works.
     score = 100
+    breakdown = []  #List of tuples describing each check and its impact
 
     #Privacy check #1: More than one input -> probably some kind of issue about multiple wallets owned by the same person.
     if len(inputs) > 1:
         score -= 20
+        breakdown.append(("Multiple inputs", -20, "Likely linked wallets or merging of funds"))
 
-    #Privacy check #2: Output address equals input address -> address reuse = bad. 
-    reused = any(
-        vout.get('scriptpubkey_address') == 
-        inputs[0].get('prevout', {}).get('scriptpubkey_address')
-        for vout in outputs
-    )
+    #Privacy check #2: Output address equals input address -> address reuse = bad.
+    reused = any(addr in output_addresses for addr in input_addresses)
     if reused:
         score -= 30
+        breakdown.append(("Address reuse", -30, "Input and output addresses overlap"))
 
     #Privacy check #3: Round number outputs (e.g., 0.01 BTC) are super common and easy to guess
     round_outputs = [v for v in outputs if v.get('value') in [1_000_000, 5_000_000, 10_000_000]]  # these are satoshis: 0.01, 0.05, 0.1 BTC
     if round_outputs:
         score -= 10
+        breakdown.append(("Round-number outputs", -10, "Likely the payment output"))
 
     #Privacy check #4: Output address is the SAME as one of the inputs = you're sending change back to yourself = traceable
-    input_addresses = [vin.get('prevout', {}).get('scriptpubkey_address') for vin in inputs]
-    output_addresses = [vout.get('scriptpubkey_address') for vout in outputs]
     for addr in output_addresses:
         if addr in input_addresses:
             score -= 20
+            breakdown.append(("Change to same address", -20, "Change returned to a reused address"))
             break
 
     #Privacy BONUS #5: One-time change address -> no reuse = good. We'll count this if at least one output is unique.
     unique_outputs = [addr for addr in output_addresses if addr not in input_addresses]
     if len(unique_outputs) >= 1:
         score += 10
+        breakdown.append(("Fresh change address", +10, "Unlinked change destination"))
 
     #Privacy BONUS #6: Equal outputs = CoinJoin-like structure -> hard to tell who got paid
     output_values = [v.get('value') for v in outputs]
     if len(output_values) >= 2 and len(set(output_values)) == 1:
         score += 15
+        breakdown.append(("Equal outputs", +15, "Could be CoinJoin-style obfuscation"))
 
-    #Return the result page with score and image
-    return render_template('result.html', score=score, txid=txid)
+    #Interpret the score for human-readable rating
+    if score >= 90:
+        judgment = "Excellent privacy"
+    elif score >= 70:
+        judgment = "Moderate privacy"
+    elif score >= 50:
+        judgment = "Weak privacy"
+    else:
+        judgment = "Very poor privacy"
+
+    #Return the result page with score, breakdown, and image
+    return render_template('result.html', score=score, txid=txid, judgment=judgment, breakdown=breakdown)
 
 #Run the Flask server
 if __name__ == '__main__':
