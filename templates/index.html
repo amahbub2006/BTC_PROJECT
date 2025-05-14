@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bitcoin Privacy Visualizer</title>
+</head>
+<body>
+    <h1>Bitcoin Transaction Privacy Checker</h1>
+    <p>Paste any BTC TXID below to analyze its privacy.</p>
+    
+    <form method="POST" action="/analyze">
+        <label>Transaction ID:</label><br>
+        <input type="text" name="txid" style="width: 400px;" required><br><br>
+        <button type="submit">Analyze</button>
+    </form>
+</body>
+</html>
