@@ -96,6 +96,6 @@ def analyze():
     #Return the result page with score and image
     return render_template('result.html', score=score, txid=txid)
 
-# Run the Flask server
+#Run the Flask server
 if __name__ == '__main__':
     app.run(debug=True)
